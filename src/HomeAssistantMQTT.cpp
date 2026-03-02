@@ -116,19 +116,9 @@ bool HomeAssistantMQTT::reconnect() {
 }
 
 void HomeAssistantMQTT::publishDiscovery() {
-    if (numModes == 0 || modeNames == nullptr) return;
-
     // Build discovery topic
     String discoveryTopic = "homeassistant/light/" + deviceId + "/config";
     String prefix = String(devicePrefix);
-
-    // Build effect list JSON array
-    String effectList = "[";
-    for (int i = 0; i < numModes; i++) {
-        if (i > 0) effectList += ",";
-        effectList += "\"" + String(modeNames[i]) + "\"";
-    }
-    effectList += "]";
 
     // Build discovery payload
     String payload = "{";
@@ -137,9 +127,21 @@ void HomeAssistantMQTT::publishDiscovery() {
     payload += "\"command_topic\":\"" + prefix + "/" + deviceId + "/light/set\",";
     payload += "\"state_topic\":\"" + prefix + "/" + deviceId + "/light/state\",";
     payload += "\"schema\":\"json\",";
-    payload += "\"brightness\":true,";
-    payload += "\"effect\":true,";
-    payload += "\"effect_list\":" + effectList + ",";
+
+    // Only include brightness and effects if modes are configured
+    if (numModes > 0 && modeNames != nullptr) {
+        payload += "\"brightness\":true,";
+        payload += "\"effect\":true,";
+
+        String effectList = "[";
+        for (int i = 0; i < numModes; i++) {
+            if (i > 0) effectList += ",";
+            effectList += "\"" + String(modeNames[i]) + "\"";
+        }
+        effectList += "]";
+        payload += "\"effect_list\":" + effectList + ",";
+    }
+
     payload += "\"device\":{";
     payload += "\"identifiers\":[\"" + deviceId + "\"],";
     payload += "\"name\":\"" + String(deviceName) + "\",";
