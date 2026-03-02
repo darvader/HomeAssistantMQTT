@@ -18,6 +18,7 @@ public:
     typedef void (*StateCallback)(bool on);
     typedef void (*BrightnessCallback)(uint8_t brightness);
     typedef void (*ModeCallback)(int mode);
+    typedef void (*NumberCallback)(float value);
 
     HomeAssistantMQTT();
 
@@ -25,6 +26,7 @@ public:
     void setDevice(const char* name, const char* manufacturer, const char* model);
     void setDevicePrefix(const char* prefix);
     void setModes(const char** names, const int* values, int count);
+    void setNumber(const char* name, const char* unit, float min, float max, float step);
 
     void setup();
     void loop();
@@ -34,9 +36,11 @@ public:
     void onState(StateCallback cb) { stateCb = cb; }
     void onBrightness(BrightnessCallback cb) { brightnessCb = cb; }
     void onMode(ModeCallback cb) { modeCb = cb; }
+    void onNumber(NumberCallback cb) { numberCb = cb; }
 
     // Publish current state to Home Assistant
     void publishState(bool on, uint8_t brightness, const char* effect);
+    void publishNumberState(float value);
 
     // MQTT broker configuration
     void setBroker(const char* host, uint16_t port = 1883);
@@ -60,6 +64,7 @@ private:
     StateCallback stateCb = nullptr;
     BrightnessCallback brightnessCb = nullptr;
     ModeCallback modeCb = nullptr;
+    NumberCallback numberCb = nullptr;
 
     char mqttHost[41] = "";
     uint16_t mqttPort = 1883;
@@ -82,10 +87,18 @@ private:
     const int* modeValues = nullptr;
     int numModes = 0;
 
+    // Configurable number entity
+    const char* numberName = nullptr;
+    const char* numberUnit = "";
+    float numberMin = 0;
+    float numberMax = 100;
+    float numberStep = 1;
+
     void mqttCallback(char* topic, byte* payload, unsigned int length);
     bool reconnect();
     void publishDiscovery();
     void publishSelectDiscovery();
+    void publishNumberDiscovery();
 };
 
 #endif
