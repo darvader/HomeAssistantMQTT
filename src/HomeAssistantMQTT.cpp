@@ -20,6 +20,14 @@ void HomeAssistantMQTT::setModes(const char** names, const int* values, int coun
     numModes = count;
 }
 
+void HomeAssistantMQTT::setNumber(const char* name, const char* unit, float min, float max, float step) {
+    numberName = name;
+    numberUnit = unit;
+    numberMin = min;
+    numberMax = max;
+    numberStep = step;
+}
+
 void HomeAssistantMQTT::setup() {
     // Generate unique device ID from MAC address (deferred to setup so WiFi is ready)
     uint8_t mac[6];
@@ -95,6 +103,7 @@ bool HomeAssistantMQTT::reconnect() {
         // Publish Home Assistant discovery messages
         publishDiscovery();
         publishSelectDiscovery();
+        publishNumberDiscovery();
 
         // Subscribe to command topics
         String prefix = String(devicePrefix);
@@ -103,6 +112,11 @@ bool HomeAssistantMQTT::reconnect() {
 
         String modeTopic = prefix + "/" + deviceId + "/mode/set";
         mqttClient.subscribe(modeTopic.c_str());
+
+        if (numberName != nullptr) {
+            String numberTopic = prefix + "/" + deviceId + "/number/set";
+            mqttClient.subscribe(numberTopic.c_str());
+        }
 
         Serial.print("Subscribed to: ");
         Serial.println(cmdTopic);
@@ -116,19 +130,9 @@ bool HomeAssistantMQTT::reconnect() {
 }
 
 void HomeAssistantMQTT::publishDiscovery() {
-    if (numModes == 0 || modeNames == nullptr) return;
-
     // Build discovery topic
     String discoveryTopic = "homeassistant/light/" + deviceId + "/config";
     String prefix = String(devicePrefix);
-
-    // Build effect list JSON array
-    String effectList = "[";
-    for (int i = 0; i < numModes; i++) {
-        if (i > 0) effectList += ",";
-        effectList += "\"" + String(modeNames[i]) + "\"";
-    }
-    effectList += "]";
 
     // Build discovery payload
     String payload = "{";
@@ -137,9 +141,21 @@ void HomeAssistantMQTT::publishDiscovery() {
     payload += "\"command_topic\":\"" + prefix + "/" + deviceId + "/light/set\",";
     payload += "\"state_topic\":\"" + prefix + "/" + deviceId + "/light/state\",";
     payload += "\"schema\":\"json\",";
-    payload += "\"brightness\":true,";
-    payload += "\"effect\":true,";
-    payload += "\"effect_list\":" + effectList + ",";
+
+    // Only include brightness and effects if modes are configured
+    if (numModes > 0 && modeNames != nullptr) {
+        payload += "\"brightness\":true,";
+        payload += "\"effect\":true,";
+
+        String effectList = "[";
+        for (int i = 0; i < numModes; i++) {
+            if (i > 0) effectList += ",";
+            effectList += "\"" + String(modeNames[i]) + "\"";
+        }
+        effectList += "]";
+        payload += "\"effect_list\":" + effectList + ",";
+    }
+
     payload += "\"device\":{";
     payload += "\"identifiers\":[\"" + deviceId + "\"],";
     payload += "\"name\":\"" + String(deviceName) + "\",";
@@ -180,6 +196,40 @@ void HomeAssistantMQTT::publishSelectDiscovery() {
 
     mqttClient.publish(discoveryTopic.c_str(), payload.c_str(), true);
     Serial.println("Published mode select discovery");
+}
+
+void HomeAssistantMQTT::publishNumberDiscovery() {
+    if (numberName == nullptr) return;
+
+    String discoveryTopic = "homeassistant/number/" + deviceId + "_number/config";
+    String prefix = String(devicePrefix);
+
+    String payload = "{";
+    payload += "\"name\":\"" + String(deviceName) + " " + String(numberName) + "\",";
+    payload += "\"unique_id\":\"" + deviceId + "_number\",";
+    payload += "\"command_topic\":\"" + prefix + "/" + deviceId + "/number/set\",";
+    payload += "\"state_topic\":\"" + prefix + "/" + deviceId + "/number/state\",";
+    payload += "\"min\":" + String(numberMin, 0) + ",";
+    payload += "\"max\":" + String(numberMax, 0) + ",";
+    payload += "\"step\":" + String(numberStep, 0) + ",";
+    if (strlen(numberUnit) > 0) {
+        payload += "\"unit_of_measurement\":\"" + String(numberUnit) + "\",";
+    }
+    payload += "\"device\":{";
+    payload += "\"identifiers\":[\"" + deviceId + "\"]";
+    payload += "}";
+    payload += "}";
+
+    mqttClient.publish(discoveryTopic.c_str(), payload.c_str(), true);
+    Serial.println("Published number discovery");
+}
+
+void HomeAssistantMQTT::publishNumberState(float value) {
+    if (!mqttClient.connected()) return;
+
+    String prefix = String(devicePrefix);
+    String stateTopic = prefix + "/" + deviceId + "/number/state";
+    mqttClient.publish(stateTopic.c_str(), String(value, 0).c_str(), true);
 }
 
 void HomeAssistantMQTT::mqttCallback(char* topic, byte* payload, unsigned int length) {
@@ -236,6 +286,16 @@ void HomeAssistantMQTT::mqttCallback(char* topic, byte* payload, unsigned int le
                 }
             }
         }
+    }
+
+    // Handle number input
+    if (topicStr.endsWith("/number/set")) {
+        float value = String(message).toFloat();
+        if (numberCb) numberCb(value);
+        // Publish number state back
+        String prefix = String(devicePrefix);
+        String stateTopic = prefix + "/" + deviceId + "/number/state";
+        mqttClient.publish(stateTopic.c_str(), message, true);
     }
 
     // Handle direct mode selection
