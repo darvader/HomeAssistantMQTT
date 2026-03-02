@@ -1,0 +1,15 @@
+{
+  "name": "HomeAssistantMQTT",
+  "version": "1.0.0",
+  "description": "ESP8266/ESP32 Home Assistant MQTT auto-discovery with EEPROM config and optional web UI",
+  "keywords": ["mqtt", "home-assistant", "esp8266", "esp32", "auto-discovery"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/darvader/HomeAssistantMQTT.git"
+  },
+  "dependencies": {
+    "knolleary/PubSubClient": "^2.8"
+  },
+  "frameworks": "arduino",
+  "platforms": ["espressif8266", "espressif32"]
+}
