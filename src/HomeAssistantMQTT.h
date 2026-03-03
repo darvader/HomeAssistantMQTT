@@ -10,7 +10,9 @@
 #endif
 #include <EEPROM.h>
 
+#ifndef MQTT_BUFFER_SIZE
 #define MQTT_BUFFER_SIZE 512
+#endif
 
 class HomeAssistantMQTT {
 public:
