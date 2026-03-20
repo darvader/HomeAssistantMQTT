@@ -40,9 +40,13 @@ public:
     void onMode(ModeCallback cb) { modeCb = cb; }
     void onNumber(NumberCallback cb) { numberCb = cb; }
 
+    // Sensor configuration (call before setup(), max 4 sensors)
+    void addSensor(const char* name, const char* unit, const char* deviceClass);
+
     // Publish current state to Home Assistant
     void publishState(bool on, uint8_t brightness, const char* effect);
     void publishNumberState(float value);
+    void publishSensorState(int index, float value);
 
     // MQTT broker configuration
     void setBroker(const char* host, uint16_t port = 1883);
@@ -96,11 +100,19 @@ private:
     float numberMax = 100;
     float numberStep = 1;
 
+    // Sensor entities (max 4)
+    static const int MAX_SENSORS = 4;
+    int numSensors = 0;
+    const char* sensorNames[4] = {};
+    const char* sensorUnits[4] = {};
+    const char* sensorDeviceClasses[4] = {};
+
     void mqttCallback(char* topic, byte* payload, unsigned int length);
     bool reconnect();
     void publishDiscovery();
     void publishSelectDiscovery();
     void publishNumberDiscovery();
+    void publishSensorDiscovery();
 };
 
 #endif

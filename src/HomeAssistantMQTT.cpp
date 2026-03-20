@@ -20,6 +20,14 @@ void HomeAssistantMQTT::setModes(const char** names, const int* values, int coun
     numModes = count;
 }
 
+void HomeAssistantMQTT::addSensor(const char* name, const char* unit, const char* deviceClass) {
+    if (numSensors >= MAX_SENSORS) return;
+    sensorNames[numSensors] = name;
+    sensorUnits[numSensors] = unit;
+    sensorDeviceClasses[numSensors] = deviceClass;
+    numSensors++;
+}
+
 void HomeAssistantMQTT::setNumber(const char* name, const char* unit, float min, float max, float step) {
     numberName = name;
     numberUnit = unit;
@@ -104,6 +112,7 @@ bool HomeAssistantMQTT::reconnect() {
         publishDiscovery();
         publishSelectDiscovery();
         publishNumberDiscovery();
+        publishSensorDiscovery();
 
         // Subscribe to command topics
         String prefix = String(devicePrefix);
@@ -423,4 +432,39 @@ bool HomeAssistantMQTT::loadMQTTConfig(String& host, uint16_t& port, String& use
     }
 
     return host.length() > 0;
+}
+
+void HomeAssistantMQTT::publishSensorDiscovery() {
+    if (numSensors == 0) return;
+
+    String prefix = String(devicePrefix);
+
+    for (int i = 0; i < numSensors; i++) {
+        String sensorId = deviceId + "_sensor_" + String(i);
+        String discoveryTopic = "homeassistant/sensor/" + sensorId + "/config";
+
+        String payload = "{";
+        payload += "\"name\":\"" + String(deviceName) + " " + String(sensorNames[i]) + "\",";
+        payload += "\"unique_id\":\"" + sensorId + "\",";
+        payload += "\"state_topic\":\"" + prefix + "/" + deviceId + "/sensor/" + String(i) + "/state\",";
+        payload += "\"unit_of_measurement\":\"" + String(sensorUnits[i]) + "\",";
+        payload += "\"device_class\":\"" + String(sensorDeviceClasses[i]) + "\",";
+        payload += "\"state_class\":\"measurement\",";
+        payload += "\"device\":{";
+        payload += "\"identifiers\":[\"" + deviceId + "\"]";
+        payload += "}";
+        payload += "}";
+
+        mqttClient.publish(discoveryTopic.c_str(), payload.c_str(), true);
+        Serial.print("Published sensor discovery: ");
+        Serial.println(sensorNames[i]);
+    }
+}
+
+void HomeAssistantMQTT::publishSensorState(int index, float value) {
+    if (!mqttClient.connected() || index < 0 || index >= numSensors) return;
+
+    String prefix = String(devicePrefix);
+    String stateTopic = prefix + "/" + deviceId + "/sensor/" + String(index) + "/state";
+    mqttClient.publish(stateTopic.c_str(), String(value, 1).c_str(), true);
 }
