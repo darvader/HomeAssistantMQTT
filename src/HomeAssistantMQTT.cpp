@@ -151,9 +151,12 @@ void HomeAssistantMQTT::publishDiscovery() {
     payload += "\"state_topic\":\"" + prefix + "/" + deviceId + "/light/state\",";
     payload += "\"schema\":\"json\",";
 
-    // Only include brightness and effects if modes are configured
-    if (numModes > 0 && modeNames != nullptr) {
+    if (brightnessCb) {
         payload += "\"brightness\":true,";
+        payload += "\"brightness_scale\":255,";
+    }
+
+    if (numModes > 0 && modeNames != nullptr) {
         payload += "\"effect\":true,";
 
         String effectList = "[";
